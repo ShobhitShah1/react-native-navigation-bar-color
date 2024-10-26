@@ -11,6 +11,7 @@ import android.app.Activity;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.WindowInsetsController;
 import androidx.annotation.UiThread;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Promise;
@@ -44,18 +45,30 @@ public class NavigationBarColorModule extends ReactContextBaseJavaModule {
     }
 
     public void setNavigationBarTheme(Activity activity, Boolean light) {
-        if (activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Window window = activity.getWindow();
-            int flags = window.getDecorView().getSystemUiVisibility();
-            if (light) {
-                flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
-            } else {
-                flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        if (activity != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                Window window = activity.getWindow();
+                int flags = window.getDecorView().getSystemUiVisibility();
+                if (light) {
+                    flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+                } else {
+                    flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+                }
+                window.getDecorView().setSystemUiVisibility(flags);
             }
-            window.getDecorView().setSystemUiVisibility(flags);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                int flag;
+                if (light) {
+                    flag = WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+                } else {
+                    flag = 0;
+                }
+                final WindowInsetsController insetsController = activity.getWindow().getInsetsController();
+                insetsController.setSystemBarsAppearance(flag, WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+            }
         }
     }
-
 
     @Override
     public String getName() {
@@ -69,13 +82,13 @@ public class NavigationBarColorModule extends ReactContextBaseJavaModule {
         // Export any constants to be used in your native module
         // https://facebook.github.io/react-native/docs/native-modules-android.html#the-toast-module
         final Map<String, Object> constants = new HashMap<>();
-        constants.put("EXAMPLE_CONSTANT", "example");
+        // constants.put("EXAMPLE_CONSTANT", "example");
 
         return constants;
     }
 
     @ReactMethod
-    public void changeNavigationBarColor(final String color, final Boolean light, final Boolean animated, final Promise promise) {
+    public void changeNavigationBarColor(final Integer color, final Boolean light, final Boolean animated, final Promise promise) {
         final WritableMap map = Arguments.createMap();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             if (getCurrentActivity() != null) {
@@ -84,10 +97,11 @@ public class NavigationBarColorModule extends ReactContextBaseJavaModule {
                     runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
-                            if (color.equals("transparent") || color.equals("translucent")) {
+                        // processColor "translucent" => null
+                            if (color.equals(0) || color==null) {
                                 window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
                                 window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
-                                if (color.equals("transparent")) {
+                                if (color!=null) {
                                     window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
                                 } else {
                                     window.setFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION, WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
@@ -104,7 +118,7 @@ public class NavigationBarColorModule extends ReactContextBaseJavaModule {
                                 Integer colorFrom = window.getNavigationBarColor();
                                 Integer colorTo = Color.parseColor(String.valueOf(color));
                                 //window.setNavigationBarColor(colorTo);
-                                ValueAnimator colorAnimation = ValueAnimator.ofObject(new ArgbEvaluator(), colorFrom, colorTo);
+                                ValueAnimator colorAnimation = ValueAnimator.ofObject(new ArgbEvaluator(), colorFrom, color.intValue());
                                 colorAnimation.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
                                     @Override
                                     public void onAnimationUpdate(ValueAnimator animator) {
@@ -113,7 +127,7 @@ public class NavigationBarColorModule extends ReactContextBaseJavaModule {
                                 });
                                 colorAnimation.start();
                             } else {
-                                window.setNavigationBarColor(Color.parseColor(String.valueOf(color)));
+                                window.setNavigationBarColor(color.intValue());
                             }
                             setNavigationBarTheme(getCurrentActivity(), light);
                             WritableMap map = Arguments.createMap();
